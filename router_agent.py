@@ -178,6 +178,53 @@ def cmd_deploy_vlan(conn, vlan_id: int, name: str):
     print(output)
 
 
+# ── Firmware upgrade ───────────────────────────────────────────────────────
+
+def cmd_firmware_upgrade(conn, protocol, server, filename, username=None, password=None, verify_only=False, reload=False):
+    if verify_only:
+        dir_out = conn.send_command("dir bootflash:")
+        print(dir_out)
+        ver = conn.send_command("show version | include Version")
+        print(ver)
+        boot = conn.send_command("show boot")
+        print(boot)
+        return
+
+    dest = f"bootflash:{filename}"
+
+    if protocol == "tftp":
+        copy_cmd = f"copy tftp://{server}/{filename} {dest}"
+    elif protocol == "ftp":
+        copy_cmd = f"copy ftp://{username}:{password}@{server}/{filename} {dest}"
+    elif protocol == "scp":
+        copy_cmd = f"copy scp://{username}@{server}/{filename} {dest}"
+    else:
+        print(f"Unsupported protocol: {protocol}")
+        return
+
+    print(f"Copying {filename} from {server} via {protocol.upper()}...")
+    output = conn.send_command_timing(copy_cmd, strip_prompt=False, strip_command=False)
+    if protocol == "scp" and username:
+        output += conn.send_command_timing(password, strip_prompt=False, strip_command=False)
+    print(output)
+
+    verify = conn.send_command(f"verify /md5 bootflash:{filename}")
+    print(f"Verification:\n{verify}")
+
+    boot_set = [f"no boot system", f"boot system flash bootflash:{filename}"]
+    config(conn, boot_set)
+    conn.save_config()
+    print(f"Boot variable set to {filename}")
+
+    if reload:
+        print("Reloading router in 3 minutes...")
+        conn.send_command("reload in 3", expect_string=r"\[confirm\]")
+        conn.send_command("y")
+        print("Reload scheduled.")
+
+    print(f"Firmware upgrade to {filename} staged. Use 'verify-only' to check status.")
+
+
 # ── Watch / Monitor ───────────────────────────────────────────────────────
 
 def cmd_watch(conn, command: str, interval: int):
@@ -606,6 +653,15 @@ def main():
     watch_p.add_argument("command")
     watch_p.add_argument("--interval", type=int, default=5)
 
+    fw_p = sub.add_parser("firmware-upgrade", help="Upgrade router IOS-XE firmware")
+    fw_p.add_argument("--protocol", choices=["tftp", "ftp", "scp"], default="tftp")
+    fw_p.add_argument("--server", help="TFTP/FTP/SCP server IP")
+    fw_p.add_argument("--filename", help="Image filename on server")
+    fw_p.add_argument("--auth-user", help="Username for FTP/SCP")
+    fw_p.add_argument("--auth-pass", help="Password for FTP/SCP")
+    fw_p.add_argument("--verify-only", action="store_true", help="Check current bootflash and boot variables")
+    fw_p.add_argument("--reload", action="store_true", help="Reload router after upgrade")
+
     build_configure_parser(sub)
 
     args = parser.parse_args()
@@ -649,6 +705,10 @@ def main():
         cmd_deploy_vlan(conn, args.vlan_id, args.name)
     elif args.action == "watch":
         cmd_watch(conn, args.command, args.interval)
+
+    elif args.action == "firmware-upgrade":
+        cmd_firmware_upgrade(conn, args.protocol, args.server, args.filename,
+                            args.auth_user, args.auth_pass, args.verify_only, args.reload)
 
     conn.disconnect()
 

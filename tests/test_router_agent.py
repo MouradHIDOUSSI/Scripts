@@ -90,3 +90,8 @@ def test_deploy_vlan_help():
 def test_watch_help():
     r = _run("watch", "--help")
     assert r.returncode == 0
+
+
+def test_firmware_upgrade_help():
+    r = _run("firmware-upgrade", "--help")
+    assert r.returncode == 0

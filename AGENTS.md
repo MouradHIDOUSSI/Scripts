@@ -21,6 +21,7 @@ python router_agent.py --host <ip> --username admin --password cisco <action> [a
 #   save                 — write memory
 #   deploy-vlan <id> <name>
 #   watch <cmd> --interval 5
+#   firmware-upgrade --protocol tftp --server 10.0.0.1 --filename csr1000v-universalk9.17.06.06a.SPA.bin [--reload]
 
 # Configure subcommands (structured config by category):
 python router_agent.py --host <ip> -u admin -p cisco configure interface --name GigabitEthernet1 --ip 10.0.0.1 --mask 255.255.255.0 --shutdown false
