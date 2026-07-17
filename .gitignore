@@ -4,3 +4,6 @@ __pycache__/
 
 # Local credentials — never commit
 credentials.txt
+
+# Chat history
+chat_history.txt
